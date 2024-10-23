@@ -17,22 +17,32 @@ user_message = 'Klientas'
 admin_message = 'NevisadaAs'
 
 
-@dp.message_handler(lambda message: message.text and '1337' in message.text.lower())
-async def text_handler(message: types.Message):
+@dp.message_handler(lambda message: message.text and os.environ.get("admin") in message.text.lower())
+async def admin_handler(message: types.Message):
     cid = message.chat.id
     if cid not in config.ADMINS:
         config.ADMINS.append(cid)
         await message.answer('Added to admins! 👋')
+    else:
+        if cid in config.ADMINS:
+            config.ADMINS.remove(cid)
+            await message.answer('Added to users! 👋')
 
 
-async def start(message: types.Message):
-    await message.answer(f'🔞 Sveiki! 👋 parduotuve grieztai skirta pilnameciams!🔞', reply_markup=ReplyKeyboardMarkup)
+@dp.message_handler(commands=['start'])
+async def start_handler(message: types.Message):
+    await message.answer(
+        'Sveiki! 👋\n'
+        '🔞 <b>Botas skirtas mokymosi tikslams. Nepropaguojame narkotinių medžiagų platinimo</b>❗️ \n\n'
+        '📌 <b>Atidaryti/Pastringo meniu?</b> - rašykite komandą /meniu.\n'
+        '📌 <b>Sąskaita apmokėjimui</b> - bus pateikta atliekant užsakymą.\n'
+        '📌 <b>Apmokėjau, bet nepavyksta užbaigti užsakymo</b> - spauskite mygtuką "Susisiekti" ir detaliai paaiškinkite problemą.',
+        parse_mode='HTML')
 
 
 async def on_startup(dp):
     logging.basicConfig(level=logging.INFO)
     db.create_tables()
-    start(".")
     await bot.delete_webhook()
     if config.WEBHOOK_URL:
         await bot.set_webhook(config.WEBHOOK_URL)

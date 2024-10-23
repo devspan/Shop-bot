@@ -130,7 +130,6 @@ async def process_name_back(message: Message, state: FSMContext):
 async def process_name(message: Message, state: FSMContext):
     async with state.proxy() as data:
         data['name'] = message.text #name pinigines adresas
-
     await CheckoutState.next()
     await message.answer('📷 Įkelkite apmokėjimo nuotrauką.', reply_markup=back_markup())
 
@@ -229,6 +228,10 @@ async def process_confirm(message: Message, state: FSMContext):
     logging.info('Deal was made.')
     async with state.proxy() as data:
         cid = message.chat.id
+        
+        # Extract the username from the message
+        username = message.from_user.username if message.from_user.username else "N/A"  # Fallback in case username is not set
+
         products = [f"{idx}={quantity}" for idx, quantity in db.fetchall('SELECT idx, quantity FROM cart WHERE cid=?', (cid,))]
 
         if 'image' in data:
@@ -236,10 +239,11 @@ async def process_confirm(message: Message, state: FSMContext):
             image_data = data['image']
 
             # Insert the image data as a binary into the database
-            db.query('INSERT INTO orders (cid, usr_name, usr_address, products, photo, status, order_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                (cid, data['name'], data['address'], ' '.join(products), image_data, 'pending', datetime.datetime.now().date()))
-            db.query('INSERT INTO orders (cid, usr_name, usr_address, products, status, order_date) VALUES (?, ?, ?, ?, ?, ?)',
-                (cid, data['name'], data['address'], ' '.join(products), 'pending', datetime.datetime.now().date()))
+            db.query('INSERT INTO orders (cid, usr_name, usr_address, usr_username, products, photo, status, order_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                (cid, data['name'], data['address'], username, ' '.join(products), image_data, 'pending', datetime.datetime.now().date()))
+        else:    
+            db.query('INSERT INTO orders (cid, usr_name, usr_address, usr_username, products, status, order_date) VALUES (?, ?, ?, ?, ?, ?, ?) ',
+                (cid, data['name'], data['address'], username, ' '.join(products), 'pending', datetime.datetime.now().date()))
 
         db.query('DELETE FROM cart WHERE cid=?', (cid,))
 
