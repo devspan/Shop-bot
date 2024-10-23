@@ -1,5 +1,6 @@
 
 import os
+from queue import Full
 import handlers
 from aiogram import executor, types
 from aiogram.types import ReplyKeyboardMarkup, ReplyKeyboardRemove
@@ -12,62 +13,33 @@ filters.setup(dp)
 
 WEBAPP_HOST = "0.0.0.0"
 WEBAPP_PORT = int(os.environ.get("PORT", 5000))
-user_message = 'Пользователь'
-admin_message = 'Админ'
+user_message = 'Klientas'
+admin_message = 'NevisadaAs'
 
 
-@dp.message_handler(commands='start')
-async def cmd_start(message: types.Message):
-
-    markup = ReplyKeyboardMarkup(resize_keyboard=True)
-
-    markup.row(user_message, admin_message)
-
-    await message.answer('''Привет! 👋
-
-🤖 Я бот-магазин по подаже товаров любой категории.
-    
-🛍️ Чтобы перейти в каталог и выбрать приглянувшиеся товары возпользуйтесь командой /menu.
-
-💰 Пополнить счет можно через Яндекс.кассу, Сбербанк или Qiwi.
-
-❓ Возникли вопросы? Не проблема! Команда /sos поможет связаться с админами, которые постараются как можно быстрее откликнуться.
-
-🤝 Заказать похожего бота? Свяжитесь с разработчиком <a href="https://t.me/NikolaySimakov">Nikolay Simakov</a>, он не кусается)))
-    ''', reply_markup=markup)
-
-
-@dp.message_handler(text=user_message)
-async def user_mode(message: types.Message):
-
-    cid = message.chat.id
-    if cid in config.ADMINS:
-        config.ADMINS.remove(cid)
-
-    await message.answer('Включен пользовательский режим.', reply_markup=ReplyKeyboardRemove())
-
-
-@dp.message_handler(text=admin_message)
-async def admin_mode(message: types.Message):
-
+@dp.message_handler(lambda message: message.text and '1337' in message.text.lower())
+async def text_handler(message: types.Message):
     cid = message.chat.id
     if cid not in config.ADMINS:
         config.ADMINS.append(cid)
+        await message.answer('Added to admins! 👋')
 
-    await message.answer('Включен админский режим.', reply_markup=ReplyKeyboardRemove())
+
+async def start(message: types.Message):
+    await message.answer(f'🔞 Sveiki! 👋 parduotuve grieztai skirta pilnameciams!🔞', reply_markup=ReplyKeyboardMarkup)
 
 
 async def on_startup(dp):
     logging.basicConfig(level=logging.INFO)
     db.create_tables()
-
+    start(".")
     await bot.delete_webhook()
     if config.WEBHOOK_URL:
         await bot.set_webhook(config.WEBHOOK_URL)
 
-
 async def on_shutdown():
     logging.warning("Shutting down..")
+
     await bot.delete_webhook()
     await dp.storage.close()
     await dp.storage.wait_closed()

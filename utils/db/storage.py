@@ -8,15 +8,15 @@ class DatabaseManager(object):
         self.conn.execute('pragma foreign_keys = on')
         self.conn.commit()
         self.cur = self.conn.cursor()
-
+    
     def create_tables(self):
         self.query('CREATE TABLE IF NOT EXISTS products (idx text, title text, body text, photo blob, price int, tag text)')
-        self.query('CREATE TABLE IF NOT EXISTS orders (cid int, usr_name text, usr_address text, products text)')
+        self.query('CREATE TABLE IF NOT EXISTS orders (cid int, usr_name text, usr_address text, products text, photo blob, comment text, status TEXT DEFAULT \'pending\', order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)')
         self.query('CREATE TABLE IF NOT EXISTS cart (cid int, idx text, quantity int)')
         self.query('CREATE TABLE IF NOT EXISTS categories (idx text, title text)')
-        self.query('CREATE TABLE IF NOT EXISTS wallet (cid int, balance real)')
+        self.query('CREATE TABLE IF NOT EXISTS notification (cid int, notification TEXT)')
         self.query('CREATE TABLE IF NOT EXISTS questions (cid int, question text)')
-        
+
     def query(self, arg, values=None):
         if values == None:
             self.cur.execute(arg)
@@ -42,18 +42,3 @@ class DatabaseManager(object):
         self.conn.close()
 
 
-'''
-
-products: idx text, title text, body text, photo blob, price int, tag text
-
-orders: cid int, usr_name text, usr_address text, products text
-
-cart: cid int, idx text, quantity int ==> product_idx
-
-categories: idx text, title text
-
-wallet: cid int, balance real
-
-questions: cid int, question text
-
-'''
