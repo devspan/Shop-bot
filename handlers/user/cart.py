@@ -20,7 +20,7 @@ async def process_cart(message: Message, state: FSMContext):
     cart_data = db.fetchall('SELECT * FROM cart WHERE cid=?', (message.chat.id,))
     
     if not cart_data:
-        await message.answer('Krepselis tuscias.')
+        await message.answer('Cart is empty.')
         return
 
     total_cost = 0
@@ -57,8 +57,8 @@ async def process_cart(message: Message, state: FSMContext):
                 await message.answer(text, reply_markup=markup)
 
     if total_cost > 0:
-        markup = ReplyKeyboardMarkup(resize_keyboard=True).add('📦 Uzsakyti').add('🔙 Back')
-        await message.answer(f'Total cost: <b>{total_cost}€</b>. Would you like to place the order?', reply_markup=markup)
+        markup = ReplyKeyboardMarkup(resize_keyboard=True).add('📦 Checkout').add('🔙 Back')
+        await message.answer(f'Total: <b>{total_cost}€</b>. Would you like to checkout?', reply_markup=markup)
 
 
 
@@ -84,7 +84,7 @@ async def update_cart(query: CallbackQuery, callback_data: dict,  state: FSMCont
     await process_cart(query.message, state)
 
 
-@dp.message_handler(IsUser(), text='📦 Uzsakyti')
+@dp.message_handler(IsUser(), text='📦 Checkout')
 async def process_checkout(message: Message, state: FSMContext):
     await CheckoutState.check_cart.set()
     await checkout(message, state)
@@ -105,7 +105,7 @@ async def checkout(message: Message, state: FSMContext):
 
 @dp.message_handler(IsUser(), lambda message: message.text not in [all_right_message, back_message], state=CheckoutState.check_cart)
 async def process_check_cart_invalid(message: Message):
-    await message.reply('Klaida.')
+    await message.reply('Error.')
 
 
 @dp.message_handler(IsUser(), text=back_message, state=CheckoutState.check_cart)
@@ -117,13 +117,14 @@ async def process_check_cart_back(message: Message, state: FSMContext):
 @dp.message_handler(IsUser(), text=all_right_message, state=CheckoutState.check_cart)
 async def process_check_cart_all_right(message: Message, state: FSMContext):
     await CheckoutState.next()
-    await message.answer('💳 Įveskite sol piniginės adresą.', reply_markup=back_markup())
+    await message.answer('💳 Enter your wallet address.', reply_markup=back_markup())
 
 
 @dp.message_handler(IsUser(), text=back_message, state=CheckoutState.name)
 async def process_name_back(message: Message, state: FSMContext):
-    await CheckoutState.check_cart.set()
-    await checkout(message, state)
+    async with state.proxy() as data:
+        await message.answer('Are you sure you want to change the address from <b>' + data['name'] + '</b>?', reply_markup=back_markup())
+    await CheckoutState.name.set()
 
 
 @dp.message_handler(IsUser(), state=CheckoutState.name)
@@ -131,7 +132,7 @@ async def process_name(message: Message, state: FSMContext):
     async with state.proxy() as data:
         data['name'] = message.text #name pinigines adresas
     await CheckoutState.next()
-    await message.answer('📷 Įkelkite apmokėjimo nuotrauką.', reply_markup=back_markup())
+    await message.answer('📷 Upload payment confirmation photo.', reply_markup=back_markup())
 
 
 from io import BytesIO
@@ -171,7 +172,7 @@ async def process_image_photo(message: types.Message, state: FSMContext):
         
         # Proceed to the next state
         await CheckoutState.next()
-        await message.answer('Pastabos', reply_markup=back_markup())
+        await message.answer('Additional Notes', reply_markup=back_markup())
 
     except Exception as e:
         logging.error(f"Error in process_image_photo: {e}")
@@ -184,15 +185,15 @@ async def process_image_url(message: Message, state: FSMContext):
     if message.text == back_message:
         await ProductState.body.set()
         async with state.proxy() as data:
-            await message.answer(f"Atgal?", reply_markup=back_markup())
+            await message.answer(f"Go back?", reply_markup=back_markup())
     else:
-        await message.answer('Reikia įkelti nuotrauką.')
+        await message.answer('Please upload a photo.')
 
 
 @dp.message_handler(IsUser(), text=back_message, state=CheckoutState.address)
 async def process_address_back(message: Message, state: FSMContext):
     async with state.proxy() as data:
-        await message.answer('Ar tikrai keisti adresą iš <b>' + data['name'] + '</b>?', reply_markup=back_markup())
+        await message.answer('Are you sure you want to change the address from <b>' + data['name'] + '</b>?', reply_markup=back_markup())
     await CheckoutState.name.set()
 
 
@@ -206,39 +207,34 @@ async def process_address(message: Message, state: FSMContext):
 
 
 async def confirm(message: Message):
-    await message.answer(f'⚠️ Įsitikinkite, kad visi duomenys teisingi ir patvirtinkite užsakymą.', reply_markup=confirm_markup())
+    await message.answer(f'⚠️ Please verify all details and confirm your order.', reply_markup=confirm_markup())
 
 
 @dp.message_handler(IsUser(), lambda message: message.text not in [confirm_message, back_message], state=CheckoutState.confirm)
 async def process_confirm_invalid(message: Message):
-    await message.reply('Klaida.')
+    await message.reply('Error.')
 
 
 @dp.message_handler(IsUser(), text=back_message, state=CheckoutState.confirm)
 async def process_confirm(message: Message, state: FSMContext):
     await CheckoutState.address.set()
     async with state.proxy() as data:
-        await message.answer('Ar tikrai keisti adresą iš <b>' + data['address'] + '</b>?', reply_markup=back_markup())
+        await message.answer('Are you sure you want to change the address from <b>' + data['address'] + '</b>?', reply_markup=back_markup())
 
 
 @dp.message_handler(IsUser(), text=confirm_message, state=CheckoutState.confirm)
 async def process_confirm(message: Message, state: FSMContext):
     markup = ReplyKeyboardRemove()
 
-    logging.info('Deal was made.')
+    logging.info('Order confirmed.')
     async with state.proxy() as data:
         cid = message.chat.id
-        
-        # Extract the username from the message
-        username = message.from_user.username if message.from_user.username else "N/A"  # Fallback in case username is not set
+        username = message.from_user.username if message.from_user.username else "N/A"
 
         products = [f"{idx}={quantity}" for idx, quantity in db.fetchall('SELECT idx, quantity FROM cart WHERE cid=?', (cid,))]
 
         if 'image' in data:
-            # Convert BytesIO to bytes
             image_data = data['image']
-
-            # Insert the image data as a binary into the database
             db.query('INSERT INTO orders (cid, usr_name, usr_address, usr_username, products, photo, status, order_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                 (cid, data['name'], data['address'], username, ' '.join(products), image_data, 'pending', datetime.datetime.now().date()))
         else:    
@@ -247,10 +243,9 @@ async def process_confirm(message: Message, state: FSMContext):
 
         db.query('DELETE FROM cart WHERE cid=?', (cid,))
 
-    # Create the message content properly
-    address = data.get('address', 'N/A')  # Ensure we have a default
-    message_content = f'Adresas: <b>{address}</b>'
-    logging.info(f"Sending message: {message_content}")  # Log the message being sent
+    address = data.get('address', 'N/A')
+    message_content = f'Delivery Address: <b>{address}</b>'
+    logging.info(f"Sending message: {message_content}")
 
     await message.answer(message_content, reply_markup=markup)
     await state.finish()

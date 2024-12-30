@@ -17,21 +17,21 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Menu options
-catalog = '🛍️ Parduotuvė'
-cart = '🛒 Perziureti krepseli'
-sos = '💬 Palikti komentarą'
-delivery_status = '🚚 Užsakymo statusas'
-create_notification = '💰 Sukurti pranesima'
-settings = '⚙️ Parduotuvės nustatymai'
-orders = '📦 Užsakymai'
-notifications = '💬 Skelbimai'
+catalog = '🛍️ Shop'
+cart = '🛒 View Cart'
+sos = '💬 Leave Feedback'
+delivery_status = '🚚 Order Status'
+create_notification = '💰 Create Announcement'
+settings = '⚙️ Shop Settings'
+orders = '📦 Orders'
+notifications = '💬 Announcements'
 
 @dp.message_handler(IsUser(), text='🛒 My Orders')
 async def process_orders(message: Message):
     orders = db.fetchall('SELECT * FROM orders WHERE cid=?', (message.chat.id,))
     
     if not orders:
-        await message.answer('❌ Uzsakymu nera.')
+        await message.answer('❌ No orders found.')
         return
     
     response = ''
@@ -68,7 +68,7 @@ async def update_order_status(message: Message):
 @dp.message_handler(IsAdmin(), text=create_notification)
 async def process_notification_start(message: Message, state: FSMContext):
     await SosState.submit.set()
-    await message.answer("✏️ Pranesimo tekstas:", reply_markup=back_markup())
+    await message.answer("✏️ Enter notification text:", reply_markup=back_markup())
 
 
 @dp.message_handler(IsAdmin(), state=SosState.submit)
@@ -76,15 +76,15 @@ async def process_notification(message: Message, state: FSMContext):
     async with state.proxy() as data:
         data['notification'] = message.text
         db.query('INSERT INTO notification (cid, notification) VALUES (?, ?)', (message.chat.id, data['notification']))
-    await message.answer("📤 Pranesimas issiustas!", reply_markup=back_markup())
+    await message.answer("📤 Notification sent!", reply_markup=back_markup())
     await state.finish()
 
 
-@dp.message_handler(IsAdmin(), text='💬 Peržiūrėti pranešimus')
+@dp.message_handler(IsAdmin(), text='💬 View Messages')
 async def process_questions(message: Message):
     questions = db.fetchall('SELECT * FROM questions')
     if len(questions) == 0:
-        await message.answer('Nera komentaru.')
+        await message.answer('No comments found.')
     else:
         for cid, question in questions:
             await message.answer(f'User ID: {cid} - {question}', reply_markup=back_markup())
@@ -92,12 +92,12 @@ async def process_questions(message: Message):
 
 @dp.message_handler(text=notifications)
 async def process_messages(message: Message):
-    notifications = db.fetchall('SELECT * FROM notification')  # Correctly call the query method
+    notifications = db.fetchall('SELECT * FROM notification')
     if notifications:
         for cid, notification in notifications:
             await message.answer(notification, reply_markup=ReplyKeyboardMarkup())  
     else:
-        await message.answer("Nera pranesimu", reply_markup=ReplyKeyboardMarkup())     
+        await message.answer("No notifications", reply_markup=ReplyKeyboardMarkup())     
 
 
 # Admin Menu
@@ -105,8 +105,8 @@ async def process_messages(message: Message):
 async def admin_menu(message: Message):
     markup = ReplyKeyboardMarkup(resize_keyboard=True, selective=True)
     markup.add(settings, orders)
-    markup.add(create_notification, '💬 Peržiūrėti pranešimus')
-    await message.answer('🛠️ Admin Meniu', reply_markup=markup)
+    markup.add(create_notification, '💬 View Messages')
+    await message.answer('🛠️ Admin Menu', reply_markup=markup)
 
 
 @dp.message_handler(IsUser(), commands='menu')
@@ -115,8 +115,8 @@ async def user_menu(message: Message):
     markup.add(catalog, cart)
     markup.add(delivery_status, sos)
     markup.add(notifications)
-    markup.add("🔙 Atgal")  # Adding the back button directly here if needed
-    await message.answer('📋 Vartotojo Meniu', reply_markup=markup)
+    markup.add("🔙 Back")
+    await message.answer('📋 User Menu', reply_markup=markup)
 
 
 # Handle the SOS request
@@ -127,8 +127,8 @@ async def sos_handler(message: Message, state: FSMContext):
             markup.add(catalog, cart)
             markup.add(delivery_status, sos)
             markup.add(notifications)
-        await SosState.question.set()  # Set the state for question
-        await message.answer('📝<b>Atsiliepimai:</b> Rašykite savo klausimą ar komentarą:', reply_markup=markup)
+        await SosState.question.set()
+        await message.answer('📝<b>Feedback:</b> Please write your question or comment:', reply_markup=markup)
 
 
 # Process the question from the user
@@ -142,13 +142,13 @@ async def process_question(message: Message, state: FSMContext):
 # Error handling for invalid responses
 @dp.message_handler(lambda message: message.text not in [cancel_message, all_right_message], state=SosState.submit)
 async def process_price_invalid(message: Message):
-    await message.answer('Klaida. Prašome pasirinkti teisingą variantą.')
+    await message.answer('Error. Please select a valid option.')
 
 
 # Handle cancel action
 @dp.message_handler(text=cancel_message, state=SosState.submit)
 async def process_cancel(message: Message, state: FSMContext):
-    await message.answer('❌ Atsaukti!', reply_markup=ReplyKeyboardMarkup())
+    await message.answer('❌ Cancelled!', reply_markup=ReplyKeyboardMarkup())
     await state.finish()
 
 
@@ -159,13 +159,13 @@ async def process_submit(message: Message, state: FSMContext):
         # Insert the question into the database
         db.query('INSERT INTO questions (cid, question) VALUES (?, ?)', (cid, data['question']))
 
-    await message.answer('✔️ Komentaras išsiųstas!', reply_markup=ReplyKeyboardMarkup())  # Ensure back button is present
+    await message.answer('✔️ Comment sent successfully!', reply_markup=ReplyKeyboardMarkup())
     await state.finish()
     await user_menu(message) 
 
 def back_markup():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, selective=True)
-    markup.add(KeyboardButton("👈 Atgal"))  # Your back button's text
+    markup.add(KeyboardButton("👈 Back"))
     return markup
     
 def send_resized_image(message :Message, image_data):

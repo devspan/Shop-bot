@@ -1,4 +1,3 @@
-
 from aiogram.dispatcher import FSMContext
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ContentType, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from aiogram.utils.callback_data import CallbackData
@@ -17,9 +16,9 @@ from hashlib import md5
 category_cb = CallbackData('category', 'id', 'action')
 product_cb = CallbackData('product', 'id', 'action')
 
-add_product = '➕ Prideti preke'
-delete_category = '🗑️ Istrinti kategorija'
-cancel_message = '❌ Atšaukti'  # Text for cancel button
+add_product = '➕ Add Product'
+delete_category = '🗑️ Delete Category'
+cancel_message = '❌ Cancel'  # Text for cancel button
 
 
 
@@ -34,9 +33,9 @@ async def process_settings(message: Message):
             title, callback_data=category_cb.new(id=idx, action='view')))
 
     markup.add(InlineKeyboardButton(
-        '+ Prideti kategorija', callback_data='add_category'))
+        '+ Add Category', callback_data='add_category'))
 
-    await message.answer('⚙️ Nustatymai kategoriju:', reply_markup=markup)
+    await message.answer('⚙️ Category Settings:', reply_markup=markup)
 
 
 @dp.callback_query_handler(IsAdmin(), category_cb.filter(action='view'))
@@ -49,7 +48,7 @@ async def category_callback_handler(query: CallbackQuery, callback_data: dict, s
                            (category_idx,))
 
     await query.message.delete()
-    await query.answer('Visos prekes pridetos i kategorija.')
+    await query.answer('All products in category.')
     await state.update_data(category_index=category_idx)
     await show_products(query.message, products, category_idx)
 
@@ -60,7 +59,7 @@ async def category_callback_handler(query: CallbackQuery, callback_data: dict, s
 @dp.callback_query_handler(IsAdmin(), text='add_category')
 async def add_category_callback_handler(query: CallbackQuery):
     await query.message.delete()
-    await query.message.answer('💬 Kategorijos pavadinimas?')
+    await query.message.answer('💬 Category Name?')
     await CategoryState.title.set()
 
 
@@ -88,7 +87,7 @@ async def delete_category_handler(message: Message, state: FSMContext):
                 'DELETE FROM products WHERE tag IN (SELECT title FROM categories WHERE idx=?)', (idx,))
             db.query('DELETE FROM categories WHERE idx=?', (idx,))
 
-            await message.answer('Prideta!', reply_markup=ReplyKeyboardRemove())
+            await message.answer('Added!', reply_markup=ReplyKeyboardRemove())
             await process_settings(message)
 
 
@@ -103,13 +102,13 @@ async def process_add_product(message: Message):
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add(cancel_message)
 
-    await message.answer('💬 Pavadinimas?', reply_markup=markup)
+    await message.answer('💬 Product Name?', reply_markup=markup)
 
 
 @dp.message_handler(IsAdmin(), text=cancel_message, state=ProductState.title)
 async def process_cancel(message: Message, state: FSMContext):
 
-    await message.answer('❌ Atsaukti!', reply_markup=ReplyKeyboardRemove())
+    await message.answer('❌ Cancelled!', reply_markup=ReplyKeyboardRemove())
     await state.finish()
 
     await process_settings(message)
@@ -127,7 +126,7 @@ async def process_title(message: Message, state: FSMContext):
         data['title'] = message.text
 
     await ProductState.next()
-    await message.answer('💬 Aprasymas', reply_markup=back_markup())
+    await message.answer('💬 Description', reply_markup=back_markup())
 
 
 @dp.message_handler(IsAdmin(), text=back_message, state=ProductState.body)
@@ -137,7 +136,7 @@ async def process_body_back(message: Message, state: FSMContext):
 
     async with state.proxy() as data:
 
-        await message.answer(f"Atgal <b>{data['title']}</b>?", reply_markup=back_markup())
+        await message.answer(f"Go back to <b>{data['title']}</b>?", reply_markup=back_markup())
 
 
 @dp.message_handler(IsAdmin(), state=ProductState.body)
@@ -147,7 +146,7 @@ async def process_body(message: Message, state: FSMContext):
         data['body'] = message.text
 
     await ProductState.next()
-    await message.answer('📷 Nuotrauka', reply_markup=back_markup())
+    await message.answer('📷 Photo', reply_markup=back_markup())
 
 
 @dp.message_handler(IsAdmin(), content_types=ContentType.PHOTO, state=ProductState.image)
@@ -161,7 +160,7 @@ async def process_image_photo(message: Message, state: FSMContext):
         data['image'] = downloaded_file
 
     await ProductState.next()
-    await message.answer('💶 Kaina?', reply_markup=back_markup())
+    await message.answer('💶 Price?', reply_markup=back_markup())
 
 
 @dp.message_handler(IsAdmin(), content_types=ContentType.TEXT, state=ProductState.image)
@@ -173,11 +172,11 @@ async def process_image_url(message: Message, state: FSMContext):
 
         async with state.proxy() as data:
 
-            await message.answer(f"Atgal <b>{data['body']}</b>?", reply_markup=back_markup())
+            await message.answer(f"Go back to <b>{data['body']}</b>?", reply_markup=back_markup())
 
     else:
 
-        await message.answer('Reikia ikelti nuotrauka.')
+        await message.answer('Please upload a photo.')
 
 
 @dp.message_handler(IsAdmin(), lambda message: not message.text.isdigit(), state=ProductState.price)
@@ -189,11 +188,11 @@ async def process_price_invalid(message: Message, state: FSMContext):
 
         async with state.proxy() as data:
 
-            await message.answer("Kita nuotrauka?", reply_markup=back_markup())
+            await message.answer("Different photo?", reply_markup=back_markup())
 
     else:
 
-        await message.answer('Nurodikite kaina!')
+        await message.answer('Please enter a valid price!')
 
 
 @dp.message_handler(IsAdmin(), lambda message: message.text.isdigit(), state=ProductState.price)
@@ -208,7 +207,7 @@ async def process_price(message: Message, state: FSMContext):
         price = data['price']
 
         await ProductState.next()
-        text = f'<b>{title}</b>\n\n{body}\n\nKaina: {price} €.'
+        text = f'<b>{title}</b>\n\n{body}\n\nPrice: {price} €.'
 
         markup = check_markup()
 
@@ -219,7 +218,7 @@ async def process_price(message: Message, state: FSMContext):
 
 @dp.message_handler(IsAdmin(), lambda message: message.text not in [back_message, all_right_message], state=ProductState.confirm)
 async def process_confirm_invalid(message: Message, state: FSMContext):
-    await message.answer('Klaida.')
+    await message.answer('Error.')
 
 
 @dp.message_handler(IsAdmin(), text=back_message, state=ProductState.confirm)
@@ -273,11 +272,11 @@ async def show_products(m, products, category_idx):
 
     for idx, title, body, image, price, tag in products:
 
-        text = f'<b>{title}</b>\n\n{body}\n\n 💶Kaina: {price} €.'
+        text = f'<b>{title}</b>\n\n{body}\n\n 💶Price: {price} €.'
 
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton(
-            '🗑️ Istrinti', callback_data=product_cb.new(id=idx, action='delete')))
+            '🗑️ Delete', callback_data=product_cb.new(id=idx, action='delete')))
 
         await m.answer_photo(photo=image,
                              caption=text,
@@ -287,4 +286,4 @@ async def show_products(m, products, category_idx):
     markup.add(add_product)
     markup.add(delete_category)
 
-    await m.answer('❔ Kanors prideti arba istrinti?', reply_markup=markup)
+    await m.answer('❔ Would you like to add or delete something?', reply_markup=markup)

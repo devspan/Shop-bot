@@ -1,0 +1,13 @@
+services:
+  bot:
+    build: .
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - ADMINS=${ADMINS}
+      - ADMIN_COMMAND=${ADMIN_COMMAND:-/admin}
+      - WEBHOOK_HOST=${WEBHOOK_HOST:-}
+      - WEBHOOK_PATH=${WEBHOOK_PATH:-}
+      - WEBAPP_HOST=${WEBAPP_HOST:-0.0.0.0}
+      - PORT=${PORT:-5000}
+    volumes:
+      - ./data:/botname/data  # This will persist the database 
